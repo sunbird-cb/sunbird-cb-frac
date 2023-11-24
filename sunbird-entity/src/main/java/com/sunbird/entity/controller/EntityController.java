@@ -115,4 +115,12 @@ public class EntityController extends BaseController {
 		Boolean response = entityService.reviewEntity(entityVerification, userProfile);
 		return handleResponse(response, ResponseCode.FAILED);
 	}
+
+	@PostMapping(value = PathRoutes.Endpoints.SEARCH_ENTITY, produces = MediaType.APPLICATION_JSON_VALUE)
+	public String getSearchEntity(@RequestBody SearchObject searchObject,
+								  @RequestAttribute(Constants.Parameters.USER_ID) String userId) throws JsonProcessingException {
+		List<EntityDao> entityDaos = entityService.searchAllEntityNodes(searchObject);
+		return handleResponse(entityDaos, ResponseCode.GET_FAILED);
+
+	}
 }

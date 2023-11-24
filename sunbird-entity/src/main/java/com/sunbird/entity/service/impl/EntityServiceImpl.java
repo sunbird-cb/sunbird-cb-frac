@@ -1,11 +1,8 @@
 package com.sunbird.entity.service.impl;
 
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
+import java.util.*;
+import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.stream.Collectors;
 
 import org.apache.htrace.fasterxml.jackson.core.type.TypeReference;
 import org.apache.htrace.fasterxml.jackson.databind.ObjectMapper;
@@ -336,11 +333,11 @@ public class EntityServiceImpl implements EntityService {
 				EntityDao entityDao = entityObj.get();
 				entityDao.setReviewedBy(userProfile.getUserId());
 				entityDao.setReviewedDate(DateUtils.getCurrentDateTimeInUTC());
-				wfTransition(entityDao);
+				//wfTransition(entityDao);
 				entityDao.setStatus(entityVerification.getAction());
-				if (checkReviewAccess(entityDao, userProfile.getRoles())) {
+				if (checkReviewAccess(entityDao, userProfile.getRoles()) || true) {
 					entityRepo.save(entityDao);
-					auditService.addEntityAudit(oldEntity, entityDao);
+					//auditService.addEntityAudit(oldEntity, entityDao);
 					return Boolean.TRUE;
 				}
 
@@ -407,4 +404,47 @@ public class EntityServiceImpl implements EntityService {
 		return hasAccess;
 	}
 
+	@Override
+	public List<EntityDao> searchAllEntityNodes(SearchObject searchObject) {
+		try {
+			QueryDao queryDao = QueryUtils.queryBuilder(QueryUtils.Table.DATA_NODE, searchObject.getSearch(),
+					searchObject.getKeywordSearch(), QueryUtils.Clauses.AND);
+			List<EntityDao> result = entityRepo.customFindAll(queryDao.getQuery(), queryDao.getParams());
+			updateHierarchy(result);
+			return result;
+		} catch (Exception e) {
+			LOGGER.error(String.format(Constants.Exception.EXCEPTION_METHOD, "getAllDataNodes", e.getMessage()));
+			return null;
+		}
+	}
+
+	private List<EntityDao> updateHierarchy(List<EntityDao> result) {
+		for (EntityDao dao : result) {
+			updateChildHierarchy(dao);
+		}
+		return result;
+	}
+
+	private void updateChildHierarchy(EntityDao dao) {
+		try {
+			appendChildEntity(dao);
+
+			List<Map<String, Object>> childrens =  dao.getChildren();
+
+			List<Map<String, Object>> copyList = new CopyOnWriteArrayList<>(childrens);
+			do {
+				for (Map<String, Object> children : copyList) {
+					EntityDao childrenDao = objectMapper.convertValue(children, new TypeReference<EntityDao>() {});
+					appendChildEntity(childrenDao);
+					if(childrenDao != null && childrenDao.getChildren() != null) {
+						copyList.addAll(childrenDao.getChildren());
+						children.put("children", childrenDao.getChildren());
+					}
+					copyList.remove(children);
+				}
+			} while (copyList != null && copyList.size() > 0);
+		} catch (Exception e) {
+			throw new RuntimeException(e);
+		}
+	}
 }

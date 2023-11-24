@@ -29,5 +29,5 @@ public interface EntityService {
 	Boolean addFeedback(Map<String, Object> feedbackDocument);
 
 	public Boolean reviewEntity(EntityVerification entityVerification, UserProfile userProfile);
-
+	public List<EntityDao> searchAllEntityNodes(SearchObject searchObject);
 }

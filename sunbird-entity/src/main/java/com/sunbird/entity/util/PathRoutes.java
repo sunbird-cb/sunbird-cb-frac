@@ -14,6 +14,7 @@ public class PathRoutes {
 		String DELETE_FILE = "/delete";
 		String NODE_FEEDBACK = "/nodeFeedback";
 		String REVIEW_ENTITY = "/reviewEntity";
+		String SEARCH_ENTITY = "/searchEntity";
 
 	}
 
