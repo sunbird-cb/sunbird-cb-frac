@@ -123,4 +123,25 @@ public class EntityController extends BaseController {
 		return handleResponse(entityDaos, ResponseCode.GET_FAILED);
 
 	}
+
+	@PostMapping(value = PathRoutes.Endpoints.ADD_ENTITY_MAPPING)
+	public String addEntityRelationMapping(@RequestBody EntityRelation entityRelation,
+									@RequestAttribute(Constants.Parameters.USER_ID) String userId) throws JsonProcessingException {
+		Boolean response = entityService.addEntityRelationMapping(entityRelation);
+		return handleResponse(response, ResponseCode.MAPPING_FAILED);
+	}
+
+	@PostMapping(value = PathRoutes.Endpoints.UPSERT_ENTITY)
+	public String upsertEntityV2(@RequestBody EntityDao entityDao,
+								  @RequestAttribute(Constants.Parameters.USER_ID) String userId) throws JsonProcessingException {
+		EntityDao entity = entityService.addUpdateEntity(entityDao, userId);
+		return handleResponse(entity, ResponseCode.CREATE_FAILED);
+	}
+
+	@PostMapping(value = PathRoutes.Endpoints.READ_ENTITY_BY_ID)
+	public String readEntityById(@PathVariable Integer id, @RequestBody SearchObject searchObject,
+								@RequestAttribute(Constants.Parameters.USER_ID) String userId) throws JsonProcessingException {
+		EntityDao entityNode = entityService.getEntityById(id, searchObject);
+		return handleResponse(entityNode, ResponseCode.GET_FAILED);
+	}
 }

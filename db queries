@@ -57,3 +57,18 @@ CREATE TABLE "bookmarks" (
       FOREIGN KEY(node_id) 
           REFERENCES data_node(id)
 );
+
+CREATE TABLE "node_mapping" (
+  "id" SERIAL NOT NULL,
+  "parent_id" INTEGER,
+  "child_id" INTEGER,
+  "status" varchar(45) DEFAULT NULL,
+  PRIMARY KEY ("id"),
+  UNIQUE(parent_id, child_id),
+  CONSTRAINT fk_datanode_parent
+      FOREIGN KEY(parent_id)
+          REFERENCES data_node(id),
+  CONSTRAINT fk_datanode_child
+      FOREIGN KEY(child_id)
+          REFERENCES data_node(id)
+)

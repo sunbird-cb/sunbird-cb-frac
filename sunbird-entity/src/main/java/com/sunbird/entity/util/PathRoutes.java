@@ -14,7 +14,13 @@ public class PathRoutes {
 		String DELETE_FILE = "/delete";
 		String NODE_FEEDBACK = "/nodeFeedback";
 		String REVIEW_ENTITY = "/reviewEntity";
-		String SEARCH_ENTITY = "/searchEntity";
+		String SEARCH_ENTITY = "/v2/search";
+
+		String ADD_ENTITY_MAPPING = "/addEntityMapping";
+
+		String UPSERT_ENTITY = "/v2/upsert";
+
+		String READ_ENTITY_BY_ID = "/v2/read/{id}";
 
 	}
 

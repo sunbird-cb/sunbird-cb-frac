@@ -30,4 +30,6 @@ public interface EntityService {
 
 	public Boolean reviewEntity(EntityVerification entityVerification, UserProfile userProfile);
 	public List<EntityDao> searchAllEntityNodes(SearchObject searchObject);
+
+	public Boolean addEntityRelationMapping(EntityRelation entityRelation);
 }

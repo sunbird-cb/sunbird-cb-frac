@@ -17,10 +17,11 @@ import com.sunbird.entity.model.QueryDao;
 public class QueryUtils {
 
 	public interface Table {
-		String DATA_NODE = "data_node";
-		String PARENT_NODE = "node_mapping_parent";
-		String CHILD_NODE = "node_mapping_child";
-		String BOOKMARK = "bookmarks";
+		String DATA_NODE = "test_data_node";
+		String PARENT_NODE = "test_node_mapping_parent";
+		String CHILD_NODE = "test_node_mapping_child";
+		String BOOKMARK = "test_bookmarks";
+		String NODE_MAPPING = "test_node_mapping";
 	}
 
 	public interface TableFields {
@@ -126,6 +127,8 @@ public class QueryUtils {
 
 		case Constants.Parameters.PARENT_ID:
 			return TableFields.PARENT_ID;
+			case Constants.Parameters.CHILD_ID:
+				return Constants.Parameters.CHILD_ID;
 		case "myRequest":
 			return TableFields.CREATED_BY;
 

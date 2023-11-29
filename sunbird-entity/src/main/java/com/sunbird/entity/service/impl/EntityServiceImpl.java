@@ -1,32 +1,9 @@
 package com.sunbird.entity.service.impl;
 
-import java.util.*;
-import java.util.concurrent.CopyOnWriteArrayList;
-import java.util.stream.Collectors;
-
-import org.apache.htrace.fasterxml.jackson.core.type.TypeReference;
-import org.apache.htrace.fasterxml.jackson.databind.ObjectMapper;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.stereotype.Service;
-
 import com.sunbird.entity.ConfigurationPanel;
-import com.sunbird.entity.model.Bookmark;
-import com.sunbird.entity.model.EntityRelation;
-import com.sunbird.entity.model.EntityVerification;
-import com.sunbird.entity.model.QueryDao;
-import com.sunbird.entity.model.SearchObject;
-import com.sunbird.entity.model.UserProfile;
-import com.sunbird.entity.model.WfRequest;
-import com.sunbird.entity.model.dao.BookmarkDao;
-import com.sunbird.entity.model.dao.ChildEntityDao;
-import com.sunbird.entity.model.dao.EntityDao;
-import com.sunbird.entity.model.dao.ParentEntityDao;
-import com.sunbird.entity.repository.BookmarkRepository;
-import com.sunbird.entity.repository.ChildEntityRepository;
-import com.sunbird.entity.repository.EntityRepository;
-import com.sunbird.entity.repository.ParentEntityRepository;
+import com.sunbird.entity.model.*;
+import com.sunbird.entity.model.dao.*;
+import com.sunbird.entity.repository.*;
 import com.sunbird.entity.service.AuditService;
 import com.sunbird.entity.service.EntityService;
 import com.sunbird.entity.service.WorkflowService;
@@ -34,6 +11,23 @@ import com.sunbird.entity.util.Constants;
 import com.sunbird.entity.util.DateUtils;
 import com.sunbird.entity.util.QueryUtils;
 import com.sunbird.entity.util.ServerProperties;
+import org.apache.htrace.fasterxml.jackson.core.type.TypeReference;
+import org.apache.htrace.fasterxml.jackson.databind.ObjectMapper;
+import org.apache.poi.ss.usermodel.CellType;
+import org.apache.poi.ss.usermodel.Row;
+import org.apache.poi.xssf.usermodel.XSSFSheet;
+import org.apache.poi.xssf.usermodel.XSSFWorkbook;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
+
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.IOException;
+import java.util.*;
+import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.stream.Collectors;
 
 @Service
 public class EntityServiceImpl implements EntityService {
@@ -62,6 +56,9 @@ public class EntityServiceImpl implements EntityService {
 
 	@Autowired
 	AuditService auditService;
+
+	@Autowired
+	EntityRelationMappingRepository entityRelationMappingRepo;
 
 	@Override
 	public EntityDao addUpdateEntity(EntityDao entityDao, String userId) {
@@ -410,7 +407,15 @@ public class EntityServiceImpl implements EntityService {
 			QueryDao queryDao = QueryUtils.queryBuilder(QueryUtils.Table.DATA_NODE, searchObject.getSearch(),
 					searchObject.getKeywordSearch(), QueryUtils.Clauses.AND);
 			List<EntityDao> result = entityRepo.customFindAll(queryDao.getQuery(), queryDao.getParams());
-			updateHierarchy(result);
+			if (searchObject.getFilter() != null) {
+				for (Map.Entry<String, Object> entry : searchObject.getFilter().entrySet()) {
+					// append child Nodes
+					if (entry.getKey().equals(Constants.Parameters.IS_DETAIL)
+							&& entry.getValue().equals(Boolean.TRUE)) {
+						updateHierarchy(result);
+					}
+				}
+			}
 			return result;
 		} catch (Exception e) {
 			LOGGER.error(String.format(Constants.Exception.EXCEPTION_METHOD, "getAllDataNodes", e.getMessage()));
@@ -427,7 +432,7 @@ public class EntityServiceImpl implements EntityService {
 
 	private void updateChildHierarchy(EntityDao dao) {
 		try {
-			appendChildEntity(dao);
+			appendChildEntityMapping(dao);
 
 			List<Map<String, Object>> childrens =  dao.getChildren();
 
@@ -435,7 +440,7 @@ public class EntityServiceImpl implements EntityService {
 			do {
 				for (Map<String, Object> children : copyList) {
 					EntityDao childrenDao = objectMapper.convertValue(children, new TypeReference<EntityDao>() {});
-					appendChildEntity(childrenDao);
+					appendChildEntityMapping(childrenDao);
 					if(childrenDao != null && childrenDao.getChildren() != null) {
 						copyList.addAll(childrenDao.getChildren());
 						children.put("children", childrenDao.getChildren());
@@ -446,5 +451,164 @@ public class EntityServiceImpl implements EntityService {
 		} catch (Exception e) {
 			throw new RuntimeException(e);
 		}
+	}
+
+	@Override
+	public Boolean addEntityRelationMapping(EntityRelation entityRelation) {
+		try {
+			for (int childId: entityRelation.getChildIds()) {
+				Map<String, Object> search = new HashMap<>();
+				search.put(Constants.Parameters.PARENT_ID, entityRelation.getParentId());
+				search.put(Constants.Parameters.CHILD_ID, childId);
+				EntityMappingDao dao = getEntityMappingById(search);
+
+				if (dao == null) {
+					EntityMappingDao entityMappingDao = new EntityMappingDao();
+					entityMappingDao.setParentId(entityRelation.getParentId());
+					entityMappingDao.setChildId(childId);
+					entityRelationMappingRepo.save(entityMappingDao);
+				} else {
+					//entityRelationMappingRepo.delete(dao);
+				}
+			}
+			return Boolean.TRUE;
+
+		} catch (Exception e) {
+			LOGGER.error(String.format(Constants.Exception.EXCEPTION_METHOD, "addEntityRelation", e.getMessage()));
+		}
+		return Boolean.FALSE;
+	}
+
+	private EntityMappingDao getEntityMappingById(Map<String, Object> search) {
+		QueryDao queryDao = QueryUtils.queryBuilder(QueryUtils.Table.NODE_MAPPING, search, Boolean.FALSE,
+				QueryUtils.Clauses.AND);
+		EntityMappingDao entityMappingDao = entityRelationMappingRepo.customFindOne(queryDao.getQuery(), queryDao.getParams());
+		return entityMappingDao;
+	}
+
+	private void appendChildEntityMapping(EntityDao entityDao) throws Exception {
+
+		Map<String, Object> searchObject = new HashMap<>();
+		searchObject.put(Constants.Parameters.PARENT_ID, entityDao.getId());
+		Map<String, Object> search = new HashMap<>();
+		search.put(Constants.Parameters.ID, getChildIdMapping(searchObject));
+		QueryDao queryDao = QueryUtils.queryBuilder(QueryUtils.Table.DATA_NODE, search, Boolean.FALSE,
+				QueryUtils.Clauses.AND);
+		List<EntityDao> childEntity = entityRepo.customFindAll(queryDao.getQuery(), queryDao.getParams());
+
+		if (entityDao.getChildren() == null) {
+			entityDao.setChildren(new ArrayList<>());
+		}
+
+		entityDao.setChildren(objectMapper.convertValue(childEntity, new TypeReference<List<Map<String, Object>>>() {
+		}));
+
+	}
+
+	private List<Integer> getChildIdMapping(Map<String, Object> search) {
+		QueryDao queryDao = QueryUtils.queryBuilder(QueryUtils.Table.NODE_MAPPING, search, Boolean.FALSE,
+				QueryUtils.Clauses.AND);
+		List<EntityMappingDao> entityMappingDaoList = entityRelationMappingRepo.customFindAll(queryDao.getQuery(), queryDao.getParams());
+		return entityMappingDaoList != null ? entityMappingDaoList.stream().map(entity -> entity.getChildId()).collect(Collectors.toList()) : new ArrayList<>();
+	}
+
+	private void processBulkUpdateCompetency(String userDetails) throws IOException {
+		File file = null;
+		FileInputStream fis = null;
+		XSSFWorkbook wb = null;
+		try {
+			file = new File("/home/sahilchaudhary/Downloads/KCM_23-11-23.xlsx");
+			if (file.exists() && file.length() > 0) {
+				fis = new FileInputStream(file);
+				wb = new XSSFWorkbook(fis);
+				XSSFSheet sheet = wb.getSheetAt(0);
+				Iterator<Row> rowIterator = sheet.iterator();
+				// incrementing the iterator inorder to skip the headers in the first row
+				while (rowIterator.hasNext()) {
+					long duration = 0;
+					long startTime = System.currentTimeMillis();
+					StringBuffer str = new StringBuffer();
+					List<String> errList = new ArrayList<>();
+					List<String> invalidErrList = new ArrayList<>();
+					Row nextRow = rowIterator.next();
+					if(nextRow.getCell(0).getCellType() != CellType.STRING) {
+						String competencyArea = nextRow.getCell(1).getStringCellValue().trim();
+						EntityDao entityDao = getEntityDAO("Competency Area",competencyArea);
+						if (entityDao == null) {
+							entityDao = new EntityDao();
+							entityDao.setType("Competency Area");
+							entityDao.setName(competencyArea);
+							entityDao.setDescription(competencyArea + "Competency Area");
+							entityDao.setCreatedBy(userDetails);
+							System.out.println(entityDao);
+							entityDao = addUpdateEntity(entityDao, userDetails);
+						}
+						String competencyType = nextRow.getCell(2).getStringCellValue().trim();
+						EntityDao entityDaoType = getEntityDAO("Competency Type",competencyType);
+						if (entityDaoType == null) {
+							entityDaoType = new EntityDao();
+							entityDaoType.setType("Competency Type");
+							entityDaoType.setName(competencyType);
+							entityDaoType.setDescription(competencyType + "Competency Type");
+							entityDaoType.setCreatedBy(userDetails);
+							System.out.println(entityDaoType);
+							entityDaoType = addUpdateEntity(entityDaoType, userDetails);
+						}
+						if(entityDaoType != null) {
+							EntityRelation entityRelation = new EntityRelation(0, "",entityDao.getId(), "", Arrays.asList(entityDaoType.getId()), "");
+							addEntityRelationMapping(entityRelation);
+							System.out.println(entityRelation);
+						}
+						String competencyName = nextRow.getCell(3).getStringCellValue().trim();
+						EntityDao entityDaoName = getEntityDAO("Competency Name",competencyName);
+						if (entityDaoName == null) {
+							entityDaoName = new EntityDao();
+							entityDaoName.setType("Competency Name");
+							entityDaoName.setName(competencyName);
+							entityDaoName.setDescription(competencyName + "competency Name");
+							entityDaoName.setCreatedBy(userDetails);
+							entityDaoName = addUpdateEntity(entityDaoName, userDetails);
+							System.out.println(entityDaoName);
+						}
+						if(entityDaoName != null) {
+							EntityRelation entityRelationType = new EntityRelation(0, "",entityDaoType.getId(), "", Arrays.asList(entityDaoName.getId()), "");
+							addEntityRelationMapping(entityRelationType);
+
+						}
+						String competencySubTheme = nextRow.getCell(4).getStringCellValue().trim();
+						EntityDao entityDaoSubtheme = getEntityDAO("Competency Sub-Theme",competencySubTheme);
+						if (entityDaoSubtheme == null) {
+							entityDaoSubtheme = new EntityDao();
+							entityDaoSubtheme.setType("Competency Sub-Theme");
+							entityDaoSubtheme.setName(competencySubTheme);
+							entityDaoSubtheme.setDescription(competencySubTheme + "Competency Area");
+							entityDaoSubtheme.setCreatedBy(userDetails);
+							entityDaoSubtheme = addUpdateEntity(entityDaoSubtheme, userDetails);
+						}
+						if(entityDaoSubtheme != null) {
+							EntityRelation entityRelationName = new EntityRelation(0, "",entityDaoName.getId(), "", Arrays.asList(entityDaoSubtheme.getId()), "");
+							addEntityRelationMapping(entityRelationName);
+						}
+					}
+				}
+			}
+		} catch (Exception e) {
+			System.out.println(e.getMessage());
+		} finally {
+			if (wb != null)
+				wb.close();
+			if (fis != null)
+				fis.close();
+		}
+	}
+
+	private  EntityDao getEntityDAO(String compatencyType, String name){
+		Map<String, Object> search = new HashMap<>();
+		search.put("type", compatencyType);
+		search.put("name", name);
+		QueryDao queryDao = QueryUtils.queryBuilder(QueryUtils.Table.DATA_NODE, search, Boolean.FALSE,
+				QueryUtils.Clauses.AND);
+		EntityDao entity = entityRepo.customFindOne(queryDao.getQuery(), queryDao.getParams());
+		return entity;
 	}
 }
