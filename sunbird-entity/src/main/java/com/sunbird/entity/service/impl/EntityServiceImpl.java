@@ -122,7 +122,8 @@ public class EntityServiceImpl implements EntityService {
 						// append child Nodes
 						if (entry.getKey().equals(Constants.Parameters.IS_DETAIL)
 								&& entry.getValue().equals(Boolean.TRUE)) {
-							appendChildEntity(result.get());
+							//appendChildEntity(result.get());
+							appendChildEntityMapping(result.get());
 						}
 					}
 				}
