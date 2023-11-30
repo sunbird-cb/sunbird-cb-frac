@@ -16,7 +16,7 @@ public class PathRoutes {
 		String REVIEW_ENTITY = "/reviewEntity";
 		String SEARCH_ENTITY = "/v2/search";
 
-		String ADD_ENTITY_MAPPING = "/addEntityMapping";
+		String UPDATE_RELATION = "/v2/update/relation";
 
 		String UPSERT_ENTITY = "/v2/upsert";
 

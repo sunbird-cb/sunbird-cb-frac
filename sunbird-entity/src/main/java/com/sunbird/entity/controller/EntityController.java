@@ -124,7 +124,7 @@ public class EntityController extends BaseController {
 
 	}
 
-	@PostMapping(value = PathRoutes.Endpoints.ADD_ENTITY_MAPPING)
+	@PostMapping(value = PathRoutes.Endpoints.UPDATE_RELATION)
 	public String addEntityRelationMapping(@RequestBody EntityRelation entityRelation,
 									@RequestAttribute(Constants.Parameters.USER_ID) String userId) throws JsonProcessingException {
 		Boolean response = entityService.addEntityRelationMapping(entityRelation);
