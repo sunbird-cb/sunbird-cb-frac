@@ -13,14 +13,19 @@ import com.sunbird.entity.util.QueryUtils;
 import com.sunbird.entity.util.ServerProperties;
 import org.apache.htrace.fasterxml.jackson.core.type.TypeReference;
 import org.apache.htrace.fasterxml.jackson.databind.ObjectMapper;
+import org.apache.http.HttpStatus;
 import org.apache.poi.ss.usermodel.CellType;
 import org.apache.poi.ss.usermodel.Row;
 import org.apache.poi.xssf.usermodel.XSSFSheet;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
+import org.joda.time.DateTime;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+import org.sunbird.common.exception.ProjectCommonException;
+import org.sunbird.common.models.util.ProjectUtil;
+import org.sunbird.common.responsecode.ResponseCode;
 
 import java.io.File;
 import java.io.FileInputStream;
@@ -405,9 +410,27 @@ public class EntityServiceImpl implements EntityService {
 	@Override
 	public List<EntityDao> searchAllEntityNodes(SearchObject searchObject) {
 		try {
-			QueryDao queryDao = QueryUtils.queryBuilder(QueryUtils.Table.DATA_NODE, searchObject.getSearch(),
-					searchObject.getKeywordSearch(), QueryUtils.Clauses.AND);
-			List<EntityDao> result = entityRepo.customFindAll(queryDao.getQuery(), queryDao.getParams());
+			List<EntityDao> result = new ArrayList<>();
+			validateSearchRequest(searchObject);
+			Map<String, Object> searchMap = searchObject.getSearch();
+			Map<String, List<String>> additionalProperties = (Map<String, List<String>>) searchMap.get(Constants.Parameters.COMPETENCY_ADDITIONAL_PROPERTIES);
+			if (additionalProperties != null) {
+				String type = (String) searchMap.get(Constants.Parameters.COMPETENCY_TYPE);
+				Optional<Map.Entry<String, List<String>>> firstEntry = additionalProperties.entrySet().stream().findFirst();
+				String themeKey = "";
+				List<String> themeValue = new ArrayList<>();
+				if (firstEntry.isPresent()) {
+					Map.Entry<String, List<String>> entry = firstEntry.get();
+					themeKey = entry.getKey();
+					themeValue = entry.getValue();
+				}
+				result = entityRepo.getEntityByTypeAndAdditionalProperties(type, themeKey, themeValue);
+			} else {
+				QueryDao queryDao = QueryUtils.queryBuilder(QueryUtils.Table.DATA_NODE, searchObject.getSearch(),
+						searchObject.getKeywordSearch(), QueryUtils.Clauses.AND);
+				result = entityRepo.customFindAll(queryDao.getQuery(), queryDao.getParams());
+			}
+
 			if (searchObject.getFilter() != null) {
 				for (Map.Entry<String, Object> entry : searchObject.getFilter().entrySet()) {
 					// append child Nodes
@@ -418,9 +441,15 @@ public class EntityServiceImpl implements EntityService {
 				}
 			}
 			return result;
+		} catch (ProjectCommonException e) {
+			LOGGER.error(String.format(Constants.Exception.EXCEPTION_METHOD, "getAllDataNodes", e.getMessage()));
+			throw e;
 		} catch (Exception e) {
 			LOGGER.error(String.format(Constants.Exception.EXCEPTION_METHOD, "getAllDataNodes", e.getMessage()));
-			return null;
+			throw new ProjectCommonException(
+					ResponseCode.SERVER_ERROR.getErrorCode(),
+					"Not Able to Process at this time.",
+					ResponseCode.SERVER_ERROR.getResponseCode());
 		}
 	}
 
@@ -520,6 +549,7 @@ public class EntityServiceImpl implements EntityService {
 		try {
 			file = new File("/home/sahilchaudhary/Downloads/KCM_23-11-23.xlsx");
 			if (file.exists() && file.length() > 0) {
+				Map<String, Object> additionalProperties = null;
 				fis = new FileInputStream(file);
 				wb = new XSSFWorkbook(fis);
 				XSSFSheet sheet = wb.getSheetAt(0);
@@ -530,22 +560,24 @@ public class EntityServiceImpl implements EntityService {
 					long startTime = System.currentTimeMillis();
 					StringBuffer str = new StringBuffer();
 					List<String> errList = new ArrayList<>();
+					 additionalProperties = new HashMap<>();
 					List<String> invalidErrList = new ArrayList<>();
 					Row nextRow = rowIterator.next();
 					if(nextRow.getCell(0).getCellType() != CellType.STRING) {
 						String competencyArea = nextRow.getCell(1).getStringCellValue().trim();
 						EntityDao entityDao = getEntityDAO("Competency Area",competencyArea);
+						String competencyType = nextRow.getCell(2).getStringCellValue().trim();
+						additionalProperties.put("themeType",competencyType);
 						if (entityDao == null) {
 							entityDao = new EntityDao();
 							entityDao.setType("Competency Area");
 							entityDao.setName(competencyArea);
-							entityDao.setDescription(competencyArea + "Competency Area");
-							entityDao.setCreatedBy(userDetails);
+							entityDao.setDescription(competencyArea + " Competency Area");
 							System.out.println(entityDao);
 							entityDao = addUpdateEntity(entityDao, userDetails);
 						}
-						String competencyType = nextRow.getCell(2).getStringCellValue().trim();
-						EntityDao entityDaoType = getEntityDAO("Competency Type",competencyType);
+
+						/*EntityDao entityDaoType = getEntityDAO("Competency Type",competencyType);
 						if (entityDaoType == null) {
 							entityDaoType = new EntityDao();
 							entityDaoType.setType("Competency Type");
@@ -559,20 +591,21 @@ public class EntityServiceImpl implements EntityService {
 							EntityRelation entityRelation = new EntityRelation(0, "",entityDao.getId(), "", Arrays.asList(entityDaoType.getId()), "");
 							addEntityRelationMapping(entityRelation);
 							System.out.println(entityRelation);
-						}
+						}*/
 						String competencyName = nextRow.getCell(3).getStringCellValue().trim();
-						EntityDao entityDaoName = getEntityDAO("Competency Name",competencyName);
+						EntityDao entityDaoName = getEntityDAO("Competency Theme",competencyName);
 						if (entityDaoName == null) {
 							entityDaoName = new EntityDao();
-							entityDaoName.setType("Competency Name");
+							entityDaoName.setType("Competency Theme");
 							entityDaoName.setName(competencyName);
-							entityDaoName.setDescription(competencyName + "competency Name");
+							entityDaoName.setDescription(competencyName + " competency Theme");
+							entityDaoName.setAdditionalProperties(additionalProperties);
 							entityDaoName.setCreatedBy(userDetails);
 							entityDaoName = addUpdateEntity(entityDaoName, userDetails);
 							System.out.println(entityDaoName);
 						}
 						if(entityDaoName != null) {
-							EntityRelation entityRelationType = new EntityRelation(0, "",entityDaoType.getId(), "", Arrays.asList(entityDaoName.getId()), "");
+							EntityRelation entityRelationType = new EntityRelation(0, "",entityDao.getId(), "", Arrays.asList(entityDaoName.getId()), "");
 							addEntityRelationMapping(entityRelationType);
 
 						}
@@ -582,7 +615,7 @@ public class EntityServiceImpl implements EntityService {
 							entityDaoSubtheme = new EntityDao();
 							entityDaoSubtheme.setType("Competency Sub-Theme");
 							entityDaoSubtheme.setName(competencySubTheme);
-							entityDaoSubtheme.setDescription(competencySubTheme + "Competency Area");
+							entityDaoSubtheme.setDescription(competencySubTheme + " Competency Area");
 							entityDaoSubtheme.setCreatedBy(userDetails);
 							entityDaoSubtheme = addUpdateEntity(entityDaoSubtheme, userDetails);
 						}
@@ -603,13 +636,31 @@ public class EntityServiceImpl implements EntityService {
 		}
 	}
 
-	private  EntityDao getEntityDAO(String compatencyType, String name){
+	private  EntityDao getEntityDAO(String competencyType, String name){
 		Map<String, Object> search = new HashMap<>();
-		search.put("type", compatencyType);
+		search.put("type", competencyType);
 		search.put("name", name);
 		QueryDao queryDao = QueryUtils.queryBuilder(QueryUtils.Table.DATA_NODE, search, Boolean.FALSE,
 				QueryUtils.Clauses.AND);
 		EntityDao entity = entityRepo.customFindOne(queryDao.getQuery(), queryDao.getParams());
 		return entity;
+	}
+
+	private boolean validateSearchRequest(SearchObject searchObject) {
+		Map<String, Object> searchMap = searchObject.getSearch();
+		Map<String, List<String>> additionalProperties = (Map<String, List<String>>) searchMap.get(Constants.Parameters.COMPETENCY_ADDITIONAL_PROPERTIES);
+		if (!searchMap.containsKey(Constants.Parameters.COMPETENCY_TYPE)) {
+			throw new ProjectCommonException(
+					ResponseCode.invalidParameter.getErrorCode(),
+					ResponseCode.invalidParameter.getErrorMessage() + " " + Constants.Parameters.COMPETENCY_ADDITIONAL_PROPERTIES,
+					ResponseCode.CLIENT_ERROR.getResponseCode());
+		}
+		if (additionalProperties != null && additionalProperties.size() > 1) {
+			throw new ProjectCommonException(
+					ResponseCode.invalidParameter.getErrorCode(),
+					ResponseCode.invalidParameter.getErrorMessage() + " " + Constants.Parameters.COMPETENCY_ADDITIONAL_PROPERTIES,
+					ResponseCode.CLIENT_ERROR.getResponseCode());
+		}
+		return true;
 	}
 }

@@ -59,6 +59,9 @@ public class Constants {
 		String ISS = "iss";
 		String EXP = "exp";
 		String KID = "kid";
+
+		String COMPETENCY_TYPE = "type";
+		String COMPETENCY_ADDITIONAL_PROPERTIES = "additionalProperties";
 	}
 
 	public interface Actions {
