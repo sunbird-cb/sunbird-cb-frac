@@ -4,8 +4,11 @@ import java.io.IOException;
 import java.util.List;
 import java.util.Map;
 
+import com.sunbird.entity.model.*;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -17,11 +20,6 @@ import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
-import com.sunbird.entity.model.Bookmark;
-import com.sunbird.entity.model.EntityRelation;
-import com.sunbird.entity.model.EntityVerification;
-import com.sunbird.entity.model.SearchObject;
-import com.sunbird.entity.model.UserProfile;
 import com.sunbird.entity.model.dao.EntityDao;
 import com.sunbird.entity.service.EntityService;
 import com.sunbird.entity.util.Constants;
@@ -117,10 +115,10 @@ public class EntityController extends BaseController {
 	}
 
 	@PostMapping(value = PathRoutes.Endpoints.SEARCH_ENTITY, produces = MediaType.APPLICATION_JSON_VALUE)
-	public String getSearchEntity(@RequestBody SearchObject searchObject,
+	public ResponseEntity<?> getSearchEntity(@RequestBody SearchObject searchObject,
 								  @RequestAttribute(Constants.Parameters.USER_ID) String userId) throws JsonProcessingException {
-		List<EntityDao> entityDaos = entityService.searchAllEntityNodes(searchObject);
-		return handleResponse(entityDaos, ResponseCode.GET_FAILED);
+		ResponseDto responseDto = entityService.searchAllEntityNodes(searchObject);
+		return new ResponseEntity<>(responseDto, HttpStatus.valueOf(responseDto.getResponseCode()));
 
 	}
 
@@ -139,9 +137,9 @@ public class EntityController extends BaseController {
 	}
 
 	@PostMapping(value = PathRoutes.Endpoints.READ_ENTITY_BY_ID)
-	public String readEntityById(@PathVariable Integer id, @RequestBody SearchObject searchObject,
+	public ResponseEntity<?> readEntityById(@PathVariable Integer id, @RequestBody SearchObject searchObject,
 								@RequestAttribute(Constants.Parameters.USER_ID) String userId) throws JsonProcessingException {
-		EntityDao entityNode = entityService.getEntityById(id, searchObject);
-		return handleResponse(entityNode, ResponseCode.GET_FAILED);
+		ResponseDto responseDto = entityService.getEntityByIdV2(id, searchObject);
+		return new ResponseEntity<>(responseDto, HttpStatus.valueOf(responseDto.getResponseCode()));
 	}
 }

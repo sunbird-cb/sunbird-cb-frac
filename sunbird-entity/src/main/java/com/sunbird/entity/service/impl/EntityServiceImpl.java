@@ -13,23 +13,22 @@ import com.sunbird.entity.util.QueryUtils;
 import com.sunbird.entity.util.ServerProperties;
 import org.apache.htrace.fasterxml.jackson.core.type.TypeReference;
 import org.apache.htrace.fasterxml.jackson.databind.ObjectMapper;
-import org.apache.http.HttpStatus;
 import org.apache.poi.ss.usermodel.CellType;
 import org.apache.poi.ss.usermodel.Row;
 import org.apache.poi.xssf.usermodel.XSSFSheet;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
-import org.joda.time.DateTime;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.sunbird.common.exception.ProjectCommonException;
-import org.sunbird.common.models.util.ProjectUtil;
 import org.sunbird.common.responsecode.ResponseCode;
 
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
+import java.text.MessageFormat;
 import java.util.*;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.stream.Collectors;
@@ -408,7 +407,8 @@ public class EntityServiceImpl implements EntityService {
 	}
 
 	@Override
-	public List<EntityDao> searchAllEntityNodes(SearchObject searchObject) {
+	public ResponseDto searchAllEntityNodes(SearchObject searchObject) {
+		ResponseDto responseDto = createDefaultResponse("api.entity.v2.search");
 		try {
 			List<EntityDao> result = new ArrayList<>();
 			validateSearchRequest(searchObject);
@@ -440,17 +440,19 @@ public class EntityServiceImpl implements EntityService {
 					}
 				}
 			}
-			return result;
+			responseDto.getResult().put("competency", result);
 		} catch (ProjectCommonException e) {
 			LOGGER.error(String.format(Constants.Exception.EXCEPTION_METHOD, "getAllDataNodes", e.getMessage()));
-			throw e;
+			responseDto.getParams().setErrmsg(e.getMessage());
+			responseDto.setResponseCode(HttpStatus.BAD_REQUEST.value());
+			responseDto.getParams().setStatus("Failed");
 		} catch (Exception e) {
 			LOGGER.error(String.format(Constants.Exception.EXCEPTION_METHOD, "getAllDataNodes", e.getMessage()));
-			throw new ProjectCommonException(
-					ResponseCode.SERVER_ERROR.getErrorCode(),
-					"Not Able to Process at this time.",
-					ResponseCode.SERVER_ERROR.getResponseCode());
+			responseDto.getParams().setErrmsg(e.getMessage());
+			responseDto.setResponseCode(HttpStatus.INTERNAL_SERVER_ERROR.value());
+			responseDto.getParams().setStatus("Failed");
 		}
+		return responseDto;
 	}
 
 	private List<EntityDao> updateHierarchy(List<EntityDao> result) {
@@ -636,6 +638,39 @@ public class EntityServiceImpl implements EntityService {
 		}
 	}
 
+	@Override
+	public ResponseDto getEntityByIdV2(Integer id, SearchObject searchObject) {
+		ResponseDto responseDto = createDefaultResponse("api.entity.v2.read");
+		try {
+			Optional<EntityDao> result = entityRepo.findById(id);
+			if (result.isPresent()) {
+				// filter the response set
+				if (searchObject.getFilter() != null) {
+					for (Map.Entry<String, Object> entry : searchObject.getFilter().entrySet()) {
+						// append child Nodes
+						if (entry.getKey().equals(Constants.Parameters.IS_DETAIL)
+								&& entry.getValue().equals(Boolean.TRUE)) {
+							//appendChildEntity(result.get());
+							appendChildEntityMapping(result.get());
+						}
+					}
+				}
+				responseDto.getResult().put("competency", result.get());
+			} else {
+				responseDto.getParams().setErrmsg("Not able to find the Entity by id: " + id);
+				responseDto.setResponseCode(HttpStatus.NOT_FOUND.value());
+				responseDto.getParams().setStatus("Failed");
+			}
+
+		} catch (Exception e) {
+			LOGGER.error(String.format(Constants.Exception.EXCEPTION_METHOD, "getEntityById", e.getMessage()));
+			responseDto.getParams().setErrmsg(e.getMessage());
+			responseDto.setResponseCode(HttpStatus.INTERNAL_SERVER_ERROR.value());
+			responseDto.getParams().setStatus("Failed");
+		}
+		return responseDto;
+	}
+
 	private  EntityDao getEntityDAO(String competencyType, String name){
 		Map<String, Object> search = new HashMap<>();
 		search.put("type", competencyType);
@@ -652,15 +687,26 @@ public class EntityServiceImpl implements EntityService {
 		if (!searchMap.containsKey(Constants.Parameters.COMPETENCY_TYPE)) {
 			throw new ProjectCommonException(
 					ResponseCode.invalidParameter.getErrorCode(),
-					ResponseCode.invalidParameter.getErrorMessage() + " " + Constants.Parameters.COMPETENCY_ADDITIONAL_PROPERTIES,
+					MessageFormat.format(ResponseCode.invalidParameter.getErrorMessage(), Constants.Parameters.COMPETENCY_TYPE , null),
 					ResponseCode.CLIENT_ERROR.getResponseCode());
 		}
 		if (additionalProperties != null && additionalProperties.size() > 1) {
 			throw new ProjectCommonException(
 					ResponseCode.invalidParameter.getErrorCode(),
-					ResponseCode.invalidParameter.getErrorMessage() + " " + Constants.Parameters.COMPETENCY_ADDITIONAL_PROPERTIES,
+					MessageFormat.format(ResponseCode.invalidParameter.getErrorMessage(), Constants.Parameters.COMPETENCY_ADDITIONAL_PROPERTIES , null),
 					ResponseCode.CLIENT_ERROR.getResponseCode());
 		}
 		return true;
+	}
+
+	private ResponseDto createDefaultResponse(String api) {
+		ResponseDto response = new ResponseDto();
+		response.setId(api);
+		response.setVer("1.0");
+		response.setParams(new ResponseParams());
+		response.getParams().setStatus("Success");
+		response.setResponseCode(HttpStatus.OK.value());
+		response.setTs(DateUtils.getCurrentTimestamp());
+		return response;
 	}
 }

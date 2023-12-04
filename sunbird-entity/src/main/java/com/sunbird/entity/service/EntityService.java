@@ -3,11 +3,7 @@ package com.sunbird.entity.service;
 import java.util.List;
 import java.util.Map;
 
-import com.sunbird.entity.model.Bookmark;
-import com.sunbird.entity.model.EntityRelation;
-import com.sunbird.entity.model.EntityVerification;
-import com.sunbird.entity.model.SearchObject;
-import com.sunbird.entity.model.UserProfile;
+import com.sunbird.entity.model.*;
 import com.sunbird.entity.model.dao.EntityDao;
 
 public interface EntityService {
@@ -29,7 +25,9 @@ public interface EntityService {
 	Boolean addFeedback(Map<String, Object> feedbackDocument);
 
 	public Boolean reviewEntity(EntityVerification entityVerification, UserProfile userProfile);
-	public List<EntityDao> searchAllEntityNodes(SearchObject searchObject);
+	public ResponseDto searchAllEntityNodes(SearchObject searchObject);
 
 	public Boolean addEntityRelationMapping(EntityRelation entityRelation);
+
+	public ResponseDto getEntityByIdV2(Integer id, SearchObject searchObject);
 }
