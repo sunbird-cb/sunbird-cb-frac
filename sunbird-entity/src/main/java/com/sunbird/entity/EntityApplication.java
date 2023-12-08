@@ -40,8 +40,8 @@ public class EntityApplication {
 		return new WebMvcConfigurerAdapter() {
 			@Override
 			public void addCorsMappings(CorsRegistry registry) {
-				registry.addMapping("/**").allowedMethods(GET, POST, PUT, DELETE, OPTIONS).allowedOrigins("*")
-						.allowedHeaders("*");
+				registry.addMapping("/**").allowedMethods(GET, POST, PUT, DELETE, OPTIONS).allowedOriginPatterns("*")
+						.allowedHeaders("*").allowCredentials(true);
 			}
 
 			@Autowired
@@ -59,7 +59,7 @@ public class EntityApplication {
 		UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
 		CorsConfiguration config = new CorsConfiguration();
 		config.setAllowCredentials(true);
-		config.addAllowedOrigin("*");
+		config.addAllowedOriginPattern("*");
 		config.addAllowedHeader("*");
 		config.addAllowedMethod("*");
 		source.registerCorsConfiguration("/**", config);
