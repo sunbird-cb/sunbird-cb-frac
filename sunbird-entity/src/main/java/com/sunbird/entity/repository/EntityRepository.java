@@ -10,6 +10,6 @@ import java.util.List;
 
 public interface EntityRepository extends CrudRepository<EntityDao, Integer>, CustomRepository<EntityDao> {
 
-    @Query(value = "Select * from test_data_node t WHERE t.type = :type AND t.additional_properties->> :themeKey IN (:themeType)", nativeQuery = true)
+    @Query(value = "Select * from data_node t WHERE t.type = :type AND t.additional_properties->> :themeKey IN (:themeType)", nativeQuery = true)
     List<EntityDao> getEntityByTypeAndAdditionalProperties(@Param("type") String type, @Param("themeKey") String themeKey, @Param("themeType") List<String> themeType);
 }

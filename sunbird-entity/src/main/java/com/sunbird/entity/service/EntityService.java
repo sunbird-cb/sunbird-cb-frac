@@ -5,6 +5,7 @@ import java.util.Map;
 
 import com.sunbird.entity.model.*;
 import com.sunbird.entity.model.dao.EntityDao;
+import org.springframework.web.multipart.MultipartFile;
 
 public interface EntityService {
 
@@ -30,4 +31,6 @@ public interface EntityService {
 	public Boolean addEntityRelationMapping(EntityRelation entityRelation);
 
 	public ResponseDto getEntityByIdV2(Integer id, SearchObject searchObject);
+
+	public ResponseDto bulkUpdateCompetencies(MultipartFile multipartFile, String userId);
 }

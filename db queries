@@ -20,7 +20,7 @@
   "is_active" BOOLEAN NOT NULL DEFAULT TRUE,
   "wf_id" varchar(250) DEFAULT NULL,
   PRIMARY KEY ("id")
-)
+);
 
 CREATE TABLE "node_mapping_parent" (
   "id" SERIAL NOT NULL,
@@ -33,7 +33,7 @@ CREATE TABLE "node_mapping_parent" (
   CONSTRAINT fk_datanode
       FOREIGN KEY(parent_id) 
           REFERENCES data_node(id)
-)
+);
 
 CREATE TABLE "node_mapping_child" (
   "id" SERIAL NOT NULL,
@@ -71,4 +71,4 @@ CREATE TABLE "node_mapping" (
   CONSTRAINT fk_datanode_child
       FOREIGN KEY(child_id)
           REFERENCES data_node(id)
-)
+);

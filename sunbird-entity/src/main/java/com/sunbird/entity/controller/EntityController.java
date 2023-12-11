@@ -142,4 +142,11 @@ public class EntityController extends BaseController {
 		ResponseDto responseDto = entityService.getEntityByIdV2(id, searchObject);
 		return new ResponseEntity<>(responseDto, HttpStatus.valueOf(responseDto.getResponseCode()));
 	}
+
+
+	@PostMapping("/v2/bulkUpdateCompetencies")
+	public ResponseEntity<ResponseDto> bulkUpdateCompetencies(@RequestParam(value = "file", required = true) MultipartFile multipartFile, @RequestAttribute(Constants.Parameters.USER_ID) String userId) {
+		ResponseDto response = entityService.bulkUpdateCompetencies(multipartFile, userId);
+		return new ResponseEntity<>(response, HttpStatus.valueOf(response.getResponseCode()));
+	}
 }
